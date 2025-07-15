@@ -1,0 +1,58 @@
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+
+# Virtual environment
+.venv/
+env/
+ENV/
+venv/
+VENV/
+pip-log.txt
+
+# CDK output
+cdk.out/
+cdk.context.json
+
+# Pytest / coverage / testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+
+# Editor/IDE stuff
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Compiled C files
+*.cpython-*
+
+# dotenv files
+.env
+.env.*
+
+# Log files
+*.log
+
+# Windows batch scripts
+*.bat
