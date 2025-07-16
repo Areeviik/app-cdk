@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-from pickletools import read_decimalnl_short
 
 import aws_cdk as cdk
 from aws_cdk import Environment
@@ -10,6 +9,7 @@ from shinecosucan_cdk.network.security_group import SecurityGroupStack
 from shinecosucan_cdk.network.alb import ALBStack
 from shinecosucan_cdk.storage.ecr import ECRStack
 from shinecosucan_cdk.storage.rds import RDSStack
+from shinecosucan_cdk.compute.ecs import ECSStack
 
 app = cdk.App()
 
@@ -58,6 +58,22 @@ alb_stack = ALBStack(
     domain_name="dev.yospace.ai",
     frontend_subdomain="shinecosucan-app",
     backend_subdomain="shinecosucan-admin",
+	env=Environment(
+		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+		region=os.getenv("CDK_DEFAULT_REGION")
+	)
+)
+
+# ECS Stack
+ecs_stack = ECSStack(
+	app, "ECSStack",
+	vpc=vpc_stack.vpc,
+	frontend_tg=alb_stack.frontend_tg,
+	backend_tg=alb_stack.backend_tg,
+	backend_image=f"{ecr_stack.repositories['backend'].repository_uri}:1",
+	frontend_image=f"{ecr_stack.repositories['frontend'].repository_uri}:1",
+	frontend_sg=security_group_stack.frontend_sg,
+	backend_sg=security_group_stack.backend_sg,
 	env=Environment(
 		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
 		region=os.getenv("CDK_DEFAULT_REGION")

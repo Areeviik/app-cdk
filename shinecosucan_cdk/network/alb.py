@@ -79,7 +79,7 @@ class ALBStack(Stack):
 		)
 		https_listener_interface = typing.cast(elb.IApplicationListener, https_listener)
 
-		frontend_tg = elb.ApplicationTargetGroup(
+		self.frontend_tg = elb.ApplicationTargetGroup(
 			self, "FrontendTargetGroup",
 			target_group_name=f"{prj_name}-{env_name}-frontend-tg",
 			vpc=vpc,
@@ -89,7 +89,7 @@ class ALBStack(Stack):
 			health_check=elb.HealthCheck(path="/", healthy_http_codes="200")
 		)
 
-		backend_tg = elb.ApplicationTargetGroup(
+		self.backend_tg = elb.ApplicationTargetGroup(
 			self, "BackendTargetGroup",
 			target_group_name=f"{prj_name}-{env_name}-backend-tg",
 			vpc=vpc,
@@ -105,7 +105,7 @@ class ALBStack(Stack):
 			listener=https_listener_interface,
 			priority=10,
 			conditions=[elb.ListenerCondition.host_headers([frontend_domain])],
-			action=elb.ListenerAction.forward([frontend_tg])
+			action=elb.ListenerAction.forward([self.frontend_tg])
 		)
 
 		elb.ApplicationListenerRule(
@@ -114,7 +114,7 @@ class ALBStack(Stack):
 			listener=https_listener_interface,
 			priority=20,
 			conditions=[elb.ListenerCondition.host_headers([backend_domain])],
-			action=elb.ListenerAction.forward([backend_tg])
+			action=elb.ListenerAction.forward([self.backend_tg])
 		)
 
 		for record_name in [frontend_domain, backend_domain]:
