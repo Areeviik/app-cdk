@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import os
+from pickletools import read_decimalnl_short
 
 import aws_cdk as cdk
 from aws_cdk import Environment
 
-from shinecosucan_cdk.vpc import VpcStack
-from shinecosucan_cdk.security_group import SecurityGroupStack
+from shinecosucan_cdk.network.vpc import VpcStack
+from shinecosucan_cdk.network.security_group import SecurityGroupStack
+from shinecosucan_cdk.storage.ecr import ECRStack
+from shinecosucan_cdk.storage.rds import RDSStack
 
 app = cdk.App()
 
@@ -29,4 +32,20 @@ security_group_stack = SecurityGroupStack(app, "SecurityGroupStack",
 					region=os.getenv('CDK_DEFAULT_REGION'))
 )
 
+# ECR Stack
+ecr_stack = ECRStack(app, "ECRStack",
+				repo_names=["frontend", "backend"],
+				env=Environment(
+					account=os.getenv('CDK_DEFAULT_ACCOUNT'),
+					region=os.getenv('CDK_DEFAULT_REGION'))
+)
+
+# RDS Stack
+rds_stack = RDSStack(app, "RDSStack",
+				vpc=vpc_stack.vpc,
+				db_sg=security_group_stack.db_sg,
+				env=Environment(
+					account=os.getenv('CDK_DEFAULT_ACCOUNT'),
+					region=os.getenv('CDK_DEFAULT_REGION'))
+)
 app.synth()
