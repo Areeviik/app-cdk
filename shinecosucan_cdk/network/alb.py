@@ -5,8 +5,6 @@ from aws_cdk import (
 	aws_certificatemanager as acm,
     aws_route53 as route53,
     aws_route53_targets as targets,
-	Duration,
-	RemovalPolicy
 )
 from constructs import Construct
 import typing

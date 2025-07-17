@@ -3,7 +3,6 @@ from aws_cdk import (
 	aws_rds as rds,
 	aws_ec2 as ec2,
 	aws_secretsmanager as secretsmanager,
-	aws_ssm as ssm
 )
 from constructs import Construct
 

@@ -28,7 +28,7 @@ class SecurityGroupStack(Stack):
 									   description="Security group for frontend services",
 									   allow_all_outbound=True
 									   )
-		self.frontend_sg.add_ingress_rule(self.alb_sg, ec2.Port.tcp(80), "Allow HTTP traffic from ALB")
+		self.frontend_sg.add_ingress_rule(self.alb_sg, ec2.Port.all_traffic(), "Allow all traffic from ALB")
 		self.frontend_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH traffic from anywhere")
 
 		# Backend SG
@@ -38,7 +38,7 @@ class SecurityGroupStack(Stack):
 									  description="Security group for backend services",
 									  allow_all_outbound=True
 									  )
-		self.backend_sg.add_ingress_rule(self.alb_sg, ec2.Port.all_traffic(), "Allow All traffic from ALB")
+		self.backend_sg.add_ingress_rule(self.alb_sg, ec2.Port.all_traffic(), "Allow all traffic from ALB")
 		self.backend_sg.add_ingress_rule(self.frontend_sg, ec2.Port.tcp(3000), "Allow traffic from frontend")
 		self.backend_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH traffic from anywhere")
 

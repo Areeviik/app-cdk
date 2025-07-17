@@ -8,7 +8,6 @@ from aws_cdk import (
 	aws_secretsmanager as secretsmanager,
 	aws_autoscaling as autoscaling
 )
-from aws_cdk.aws_codepipeline_actions import EcrBuildAndPublishAction
 from constructs import Construct
 
 class ECSStack(Stack):
@@ -166,8 +165,7 @@ class ECSStack(Stack):
 			image=ecs.ContainerImage.from_registry(backend_image),
 			essential=False,
 			command=["npm", "run", "start:worker"],
-			memory_limit_mib=256,
-			cpu=256,
+			cpu=0,
 			environment={
 				"SUPERADMIN_PASSWORD": "superadmin",
 				"APP_ENV": "dev",
@@ -191,9 +189,10 @@ class ECSStack(Stack):
 			),
 		)
 
-		frontend_service = ecs.CfnService(
+		self.frontend_service = ecs.CfnService(
 			self, "FrontendService",
 			cluster=self.cluster.cluster_name,
+			service_name=f"{prj_name}-{env_name}-frontend-service",
 			task_definition=frontend_task_definition.task_definition_arn,
 			launch_type="EC2",
 			scheduling_strategy="DAEMON",
@@ -204,9 +203,10 @@ class ECSStack(Stack):
 			)]
 		)
 
-		backend_service = ecs.CfnService(
+		self.backend_service = ecs.CfnService(
 			self, "BackendService",
 			cluster=self.cluster.cluster_name,
+			service_name=f"{prj_name}-{env_name}-backend-service",
 			task_definition=backend_task_definition.task_definition_arn,
 			launch_type="EC2",
 			scheduling_strategy="DAEMON",
