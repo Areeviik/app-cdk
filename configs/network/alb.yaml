@@ -1,0 +1,14 @@
+project_name: shinecosucan
+env: test
+vpc: main
+
+domain_name: dev.yospace.ai
+frontend_subdomain: shinecosucan-app
+backend_subdomain: shinecosucan-admin
+
+frontend_port: 8002
+backend_port: 3000
+
+availability_zones:
+  - eu-west-1a
+  - eu-west-1b

@@ -1,0 +1,30 @@
+project_name: shinecosucan
+env: test
+vpc: main
+availability_zones:
+  - eu-west-1a
+  - eu-west-1b
+
+instances:
+  - name: vendure-db
+    db_name: vendure
+    username: postgres
+    engine_version: "15.5"
+    instance_class: BURSTABLE3
+    instance_size: MICRO
+    multi_az: false
+    storage_encrypted: false
+    deletion_protection: false
+    subnet_type: PUBLIC
+    port: 5432
+#  - name: analytics-db
+#    db_name: analytics
+#    username: analyst
+#    engine_version: "15.5"
+#    instance_class: BURSTABLE3
+#    instance_size: MICRO
+#    multi_az: false
+#    storage_encrypted: false
+#    deletion_protection: false
+#    subnet_type: PRIVATE_ISOLATED
+#    port: 5432

@@ -35,7 +35,7 @@ class SecurityGroupStack(Stack):
         vpc_id = get_ssm_parameter(self, vpc_param_name)
         vpc = ec2.Vpc.from_vpc_attributes(self, "Vpc",
             vpc_id=vpc_id,
-            availability_zones=["eu-west-1a", "eu-west-1b"]
+            availability_zones=[az for az in config.get("availability_zones")],
         )
 
         self.security_groups = {}

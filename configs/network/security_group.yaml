@@ -1,6 +1,9 @@
 project_name: shinecosucan
 env: test
 vpc: main
+availability_zones:
+  - eu-west-1a
+  - eu-west-1b
 
 security_groups:
   - name: alb-sg

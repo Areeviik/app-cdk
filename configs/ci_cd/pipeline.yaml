@@ -1,0 +1,22 @@
+project_name: shinecosucan
+env: test
+vpc: main
+availability_zones:
+  - eu-west-1a
+  - eu-west-1b
+
+github_username: Areeviik
+artifact_bucket: "shinecosucan-test-artifacts"
+
+pipelines:
+  frontend:
+    repo: app-frontend
+    branch: main
+    build_cache_prefix: "frontend-codebuild-cache"
+    ecs_service_name: "shinecosucan-test-frontend-service"
+
+  backend:
+    repo: app-backend
+    branch: main
+    build_cache_prefix: "codebuild-cache"
+    ecs_service_name: "shinecosucan-test-backend-service"

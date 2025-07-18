@@ -1,10 +1,10 @@
 from aws_cdk import (
     Stack,
     aws_ec2 as ec2,
-    aws_ssm as ssm
 )
 from constructs import Construct
 from utils.yaml_loader import load_yaml
+from utils.ssm import put_ssm_parameter
 
 class VpcStack(Stack):
     def __init__(
@@ -47,19 +47,11 @@ class VpcStack(Stack):
             )
 
             self.vpcs[vpc_name] = vpc
+            put_ssm_parameter(self, f"/{prj_name}/{env_name}/vpc/{vpc_name}", vpc.vpc_id)
 
-            ssm.StringParameter(
-                self,
-                f"{vpc_id}-VpcIdParam",
-                string_value=vpc.vpc_id,
-                parameter_name=f"/{prj_name}/{env_name}/vpc/{vpc_name}"
-            )
+            for i, pvs in enumerate(vpc.private_subnets):
+                put_ssm_parameter(self, f"/{prj_name}/{env_name}/subnet/private/{i}", pvs.subnet_id)
 
-            priv_subs = [subnet.subnet_id for subnet in vpc.private_subnets]
-            for i, ps in enumerate(priv_subs, 1):
-                ssm.StringParameter(
-                    self,
-                    f"{vpc_id}-PrivateSubnet{i}Param",
-                    string_value=ps,
-                    parameter_name=f"{prj_name}/{env_name}/subnet/private-{i}"
-                )
+            for i, pbs in enumerate(vpc.public_subnets):
+                put_ssm_parameter(self, f"/{prj_name}/{env_name}/subnet/public/{i}", pbs.subnet_id)
+

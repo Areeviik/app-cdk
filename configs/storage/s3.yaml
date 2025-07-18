@@ -1,0 +1,13 @@
+project_name: shinecosucan
+env: test
+
+buckets:
+  - name: artifacts
+    access_control: BUCKET_OWNER_FULL_CONTROL
+    encryption: S3_MANAGED
+    public_block: true
+
+  - name: frontend
+    access_control: BUCKET_OWNER_FULL_CONTROL
+    encryption: S3_MANAGED
+    public_block: true
