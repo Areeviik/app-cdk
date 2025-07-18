@@ -52,7 +52,7 @@ class VpcStack(Stack):
                 self,
                 f"{vpc_id}-VpcIdParam",
                 string_value=vpc.vpc_id,
-                parameter_name=f"/{prj_name}/{env_name}/{vpc_id}"
+                parameter_name=f"/{prj_name}/{env_name}/vpc/{vpc_name}"
             )
 
             priv_subs = [subnet.subnet_id for subnet in vpc.private_subnets]

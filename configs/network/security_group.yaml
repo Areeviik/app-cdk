@@ -1,0 +1,56 @@
+project_name: shinecosucan
+env: test
+vpc: main
+
+security_groups:
+  - name: alb-sg
+    description: Security group for ALB
+    allow_all_outbound: true
+    ingress:
+      - port: 80
+        protocol: tcp
+        cidr: "0.0.0.0/0"
+        description: Allow HTTP traffic
+      - port: 443
+        protocol: tcp
+        cidr: "0.0.0.0/0"
+        description: Allow HTTPS traffic
+
+  - name: frontend-sg
+    description: Security group for frontend
+    allow_all_outbound: true
+    ingress:
+      - port: -1
+        protocol: all
+        source_sg: alb-sg
+        description: Allow all traffic from ALB
+      - port: 22
+        protocol: tcp
+        cidr: "0.0.0.0/0"
+        description: Allow SSH traffic
+
+  - name: backend-sg
+    description: Security group for backend
+    allow_all_outbound: true
+    ingress:
+      - port: -1
+        protocol: all
+        source_sg: alb-sg
+        description: Allow all traffic from ALB
+      - port: 3000
+        protocol: tcp
+        source_sg: frontend-sg
+        description: Allow traffic from frontend
+      - port: 22
+        protocol: tcp
+        cidr: "0.0.0.0/0"
+        description: Allow SSH
+
+  - name: db-sg
+    description: Security group for PostgreSQL DB
+    allow_all_outbound: true
+    ingress:
+      - port: 5432
+        protocol: tcp
+        source_sg: backend-sg
+        description: Allow PostgreSQL traffic from backend

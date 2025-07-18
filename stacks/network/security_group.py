@@ -1,52 +1,91 @@
 from aws_cdk import (
-	Stack,
-	aws_ec2 as ec2,
+    Stack,
+    aws_ec2 as ec2,
+    aws_ssm as ssm
 )
 from constructs import Construct
+from utils.yaml_loader import load_yaml
+from utils.ssm import get_ssm_parameter
+
+def create_security_group(scope: Construct, sg_id: str, name: str, vpc: ec2.IVpc, description: str) -> ec2.SecurityGroup:
+    return ec2.SecurityGroup(
+        scope,
+        sg_id,
+        security_group_name=name,
+        vpc=vpc,
+        description=description,
+        allow_all_outbound=True
+    )
 
 class SecurityGroupStack(Stack):
-	def __init__(self, scope: Construct, construct_id:str, vpc:ec2.Vpc, **kwargs)->None:
-		super().__init__(scope, construct_id, **kwargs)
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        config_path: str,
+        **kwargs
+    ) -> None:
+        super().__init__(scope, construct_id, **kwargs)
 
-		prj_name = self.node.try_get_context("project_name")
-		env_name = self.node.try_get_context("env")
+        config = load_yaml(config_path)
+        prj_name = config["project_name"]
+        env_name = config["env"]
 
-		# ALB SG
-		self.alb_sg = ec2.SecurityGroup(self, "ALBSecurityGroup",
-								   security_group_name=f"{prj_name}-{env_name}-alb-sg",
-								   vpc = vpc,
-								   description="Security group for ALB",
-								   allow_all_outbound=True
-								   )
-		self.alb_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP traffic")
-		self.alb_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(443), "Allow HTTPS traffic")
+        vpc_param_name = f"/{prj_name}/{env_name}/vpc/{config['vpc']}"
+        vpc_id = get_ssm_parameter(self, vpc_param_name)
+        vpc = ec2.Vpc.from_vpc_attributes(self, "Vpc",
+            vpc_id=vpc_id,
+            availability_zones=["eu-west-1a", "eu-west-1b"]
+        )
 
-		# Frontend SG
-		self.frontend_sg = ec2.SecurityGroup(self, "FrontendSecurityGroup",
-									   security_group_name=f"{prj_name}-{env_name}-frontend-sg",
-									   vpc = vpc,
-									   description="Security group for frontend services",
-									   allow_all_outbound=True
-									   )
-		self.frontend_sg.add_ingress_rule(self.alb_sg, ec2.Port.all_traffic(), "Allow all traffic from ALB")
-		self.frontend_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH traffic from anywhere")
+        self.security_groups = {}
 
-		# Backend SG
-		self.backend_sg = ec2.SecurityGroup(self, "BackendSecurityGroup",
-									  security_group_name=f"{prj_name}-{env_name}-backend-sg",
-									  vpc = vpc,
-									  description="Security group for backend services",
-									  allow_all_outbound=True
-									  )
-		self.backend_sg.add_ingress_rule(self.alb_sg, ec2.Port.all_traffic(), "Allow all traffic from ALB")
-		self.backend_sg.add_ingress_rule(self.frontend_sg, ec2.Port.tcp(3000), "Allow traffic from frontend")
-		self.backend_sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH traffic from anywhere")
+        for sg_conf in config.get("security_groups", []):
+            sg_name = sg_conf["name"]
+            sg_id = f"{prj_name}-{env_name}-{sg_name}-sg"
+            description = sg_conf.get("description", "")
 
-		# Database SG
-		self.db_sg = ec2.SecurityGroup(self, "DatabaseSecurityGroup",
-								  security_group_name=f"{prj_name}-{env_name}-db-sg",
-								  vpc = vpc,
-								  description="Security group for database",
-								  allow_all_outbound=True
-								  )
-		self.db_sg.add_ingress_rule(self.backend_sg, ec2.Port.tcp(5432), "Allow PostsgreSQL traffic from backend")
+            sg = create_security_group(
+                self,
+                sg_id,
+                f"{prj_name}-{env_name}-{sg_name}",
+                vpc,
+                description
+            )
+
+            self.security_groups[sg_name] = sg
+
+            for rule in sg_conf.get("ingress", []):
+                peer = self._resolve_peer(rule)
+                port = self._resolve_port(rule)
+                description = rule.get("description", "")
+                sg.add_ingress_rule(peer, port, description)
+
+            ssm.StringParameter(self, f"{sg_name}SGParam",
+                parameter_name=f"/{prj_name}/{env_name}/sg/{sg_name}",
+                string_value=sg.security_group_id
+            )
+
+    def _resolve_peer(self, rule: dict) -> ec2.IPeer:
+        if "cidr" in rule:
+            return ec2.Peer.ipv4(rule["cidr"])
+        elif "source_sg" in rule:
+            source_sg_name = rule["source_sg"]
+            if source_sg_name not in self.security_groups:
+                raise ValueError(f"Security group '{source_sg_name}' not found for source_sg reference.")
+            return self.security_groups[source_sg_name]
+        else:
+            raise ValueError("Ingress rule must include either 'cidr' or 'source_sg'.")
+
+    def _resolve_port(self, rule: dict) -> ec2.Port:
+        port = rule["port"]
+        protocol = rule.get("protocol", "tcp")
+
+        if port == -1:
+            return ec2.Port.all_traffic()
+        elif protocol == "tcp":
+            return ec2.Port.tcp(port)
+        elif protocol == "udp":
+            return ec2.Port.udp(port)
+        else:
+            raise ValueError(f"Unsupported protocol '{protocol}' in rule: {rule}")

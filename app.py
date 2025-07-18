@@ -24,14 +24,9 @@ max_azs = app.node.try_get_context("max_azs") or int(os.getenv("MAX_AZS") or 2)
 # VPC Stack
 vpc_stack = VpcStack(app, "VPCStack","configs/network/vpc.yaml")
 
-# # Security Group Stack
-# security_group_stack = SecurityGroupStack(app, "SecurityGroupStack",
-# 				vpc=vpc_stack.vpc,
-# 				env=Environment(
-# 					account=os.getenv('CDK_DEFAULT_ACCOUNT'),
-# 					region=os.getenv('CDK_DEFAULT_REGION'))
-# )
-#
+# Security Group Stack
+security_group_stack = SecurityGroupStack(app, "SecurityGroupStack", "configs/network/security_group.yaml")
+
 # # ECR Stack
 # ecr_stack = ECRStack(app, "ECRStack",
 # 				repo_names=["frontend", "backend"],
