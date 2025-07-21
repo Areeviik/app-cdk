@@ -7,22 +7,44 @@ from aws_cdk import (
     aws_route53_targets as targets,
 )
 from constructs import Construct
-import typing
+from utils.yaml_loader import load_yaml
+from utils.ssm import get_ssm_parameter, put_ssm_parameter, get_ssm_subnet_ids
 
 class ALBStack(Stack):
 	def __init__(
-			self, scope: Construct, construct_id: str,
-			vpc: ec2.Vpc,
-			alb_sg: ec2.SecurityGroup,
-			domain_name: str,
-			frontend_subdomain: str,
-			backend_subdomain: str,
+			self,
+			scope: Construct,
+			construct_id: str,
+			config_path: str,
 			**kwargs
 	) -> None:
 		super().__init__(scope, construct_id, **kwargs)
 
-		prj_name = self.node.try_get_context("project_name")
-		env_name = self.node.try_get_context("env")
+		config = load_yaml(config_path)
+		prj_name = config["project_name"]
+		env_name = config["env"]
+
+		public_subnet_ids = get_ssm_subnet_ids(
+			self, f"/{prj_name}/{env_name}/subnet/public", 2
+		)
+
+		vpc_param = f"/{prj_name}/{env_name}/vpc/{config['vpc']}"
+		vpc_id = get_ssm_parameter(self, vpc_param)
+		vpc = ec2.Vpc.from_vpc_attributes(
+			self,
+			"Vpc",
+			vpc_id=vpc_id,
+			availability_zones=[az for az in config.get("availability_zones")],
+			public_subnet_ids=public_subnet_ids,
+		)
+
+		alb_sg_param = f"/{prj_name}/{env_name}/sg/alb-sg"
+		alb_sg_id = get_ssm_parameter(self, alb_sg_param)
+		alb_sg = ec2.SecurityGroup.from_security_group_id(self, "AlbSecurityGroup", alb_sg_id)
+
+		domain_name = config["domain_name"]
+		frontend_subdomain = config["frontend_subdomain"]
+		backend_subdomain = config["backend_subdomain"]
 
 		hosted_zone = route53.HostedZone.from_lookup(
 			self,
@@ -51,6 +73,9 @@ class ALBStack(Stack):
 			security_group=alb_sg,
 		)
 
+		put_ssm_parameter(self, f"/{prj_name}/{env_name}/loadbalancer", self.alb.load_balancer_arn)
+
+
 		http_listener = self.alb.add_listener(
 			"HTTPListener",
 			port=80,
@@ -59,8 +84,8 @@ class ALBStack(Stack):
 		http_listener.add_action(
 			"HttpRedirect",
 			action=elb.ListenerAction.redirect(
-				port="443",
-				protocol="HTTPS"
+				protocol="HTTPS",
+				port="443"
 			)
 		)
 
@@ -75,32 +100,35 @@ class ALBStack(Stack):
 				message_body="Not found"
 			)
 		)
-		https_listener_interface = typing.cast(elb.IApplicationListener, https_listener)
 
 		self.frontend_tg = elb.ApplicationTargetGroup(
 			self, "FrontendTargetGroup",
 			target_group_name=f"{prj_name}-{env_name}-frontend-tg",
 			vpc=vpc,
-			port=8002,
+			port=config.get("frontend_port"),
 			protocol=elb.ApplicationProtocol.HTTP,
 			target_type=elb.TargetType.INSTANCE,
 			health_check=elb.HealthCheck(path="/", healthy_http_codes="200")
 		)
 
+		put_ssm_parameter(self, f"/{prj_name}/{env_name}/targetgroup/frontend", self.frontend_tg.target_group_arn)
+
 		self.backend_tg = elb.ApplicationTargetGroup(
 			self, "BackendTargetGroup",
 			target_group_name=f"{prj_name}-{env_name}-backend-tg",
 			vpc=vpc,
-			port=3000,
+			port=config.get("backend_port"),
 			protocol=elb.ApplicationProtocol.HTTP,
 			target_type=elb.TargetType.INSTANCE,
 			health_check=elb.HealthCheck(path="/health", healthy_http_codes="200")
 		)
 
+		put_ssm_parameter(self, f"/{prj_name}/{env_name}/targetgroup/backend", self.backend_tg.target_group_arn)
+
 		elb.ApplicationListenerRule(
 			self,
 			"FrontendRule",
-			listener=https_listener_interface,
+			listener=https_listener,
 			priority=10,
 			conditions=[elb.ListenerCondition.host_headers([frontend_domain])],
 			action=elb.ListenerAction.forward([self.frontend_tg])
@@ -109,7 +137,7 @@ class ALBStack(Stack):
 		elb.ApplicationListenerRule(
 			self,
 			"BackendRule",
-			listener=https_listener_interface,
+			listener=https_listener,
 			priority=20,
 			conditions=[elb.ListenerCondition.host_headers([backend_domain])],
 			action=elb.ListenerAction.forward([self.backend_tg])
@@ -122,3 +150,4 @@ class ALBStack(Stack):
 				record_name=record_name,
 				target=route53.RecordTarget.from_alias(targets.LoadBalancerTarget(self.alb))
 			)
+
