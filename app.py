@@ -24,16 +24,16 @@ vpc_stack = VpcStack(app, "VPCStack","configs/network/vpc.yaml")
 
 # Security Group Stack
 security_group_stack = SecurityGroupStack(app, "SecurityGroupStack", "configs/network/security_group.yaml")
-#
-# # ALB Stack
-# alb_stack = ALBStack(
-# 	app, "ALBStack",
-# 	"configs/network/alb.yaml",
-# 	env=Environment(
-# 		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
-# 		region=os.getenv("CDK_DEFAULT_REGION")
-# 	)
-# )
+
+# ALB Stack
+alb_stack = ALBStack(
+	app, "ALBStack",
+	"configs/network/alb.yaml",
+	env=Environment(
+		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+		region=os.getenv("CDK_DEFAULT_REGION")
+	)
+)
 #
 # # RDS Stack
 # rds_stack = RDSStack(
