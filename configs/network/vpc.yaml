@@ -5,6 +5,7 @@ vpcs:
   - name: main
     cidr: "10.0.0.0/16"
     max_azs: 2
+    nat_gateways: 0
     subnets:
       - name: Public
         type: PUBLIC
@@ -12,11 +13,11 @@ vpcs:
       - name: Private
         type: PRIVATE_ISOLATED
         cidr_mask: 24
-#
-#  - name: monitoring-vpc
-#    cidr: "10.1.0.0/16"
-#    max_azs: 2
-#    subnets:
-#      - name: public
-#        type: PUBLIC
-#        cidr_mask: 24
+
+  - name: secondary
+    cidr: "10.1.0.0/16"
+    max_azs: 2
+    subnets:
+      - name: public
+        type: PUBLIC
+        cidr_mask: 24

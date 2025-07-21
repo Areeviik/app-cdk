@@ -24,7 +24,7 @@ class VpcStack(Stack):
 
         for vpc_cfg in vpc_configs:
             vpc_name = vpc_cfg["name"]
-            cidr = vpc_cfg.get("cidr", "10.0.0.0/16")
+            cidr = vpc_cfg["cidr"]
             max_azs = vpc_cfg.get("max_azs", 2)
 
             subnet_configs = []
@@ -33,7 +33,7 @@ class VpcStack(Stack):
                 subnet_configs.append(ec2.SubnetConfiguration(
                     name=subnet["name"],
                     subnet_type=subnet_type,
-                    cidr_mask=subnet["cidr_mask"]
+                    cidr_mask=subnet.get("cidr_mask", 24)
                 ))
 
             vpc_id = f"{prj_name}-{env_name}-vpc-{vpc_name}"
@@ -43,15 +43,18 @@ class VpcStack(Stack):
                 vpc_id,
                 ip_addresses=ec2.IpAddresses.cidr(cidr),
                 max_azs=max_azs,
-                subnet_configuration=subnet_configs
+                subnet_configuration=subnet_configs,
+                nat_gateways=vpc_cfg.get("nat_gateways", 0),
             )
 
             self.vpcs[vpc_name] = vpc
             put_ssm_parameter(self, f"/{prj_name}/{env_name}/vpc/{vpc_name}", vpc.vpc_id)
 
-            for i, pvs in enumerate(vpc.private_subnets):
-                put_ssm_parameter(self, f"/{prj_name}/{env_name}/subnet/private/{i}", pvs.subnet_id)
+            if vpc.isolated_subnets:
+                for i, pvs in enumerate(vpc.isolated_subnets):
+                    put_ssm_parameter(self, f"/{prj_name}/{env_name}/{vpc_name}/subnet/private/{i}", pvs.subnet_id)
 
-            for i, pbs in enumerate(vpc.public_subnets):
-                put_ssm_parameter(self, f"/{prj_name}/{env_name}/subnet/public/{i}", pbs.subnet_id)
-
+            if vpc.public_subnets:
+                for i, pbs in enumerate(vpc.public_subnets):
+                    put_ssm_parameter(self, f"/{prj_name}/{env_name}/{vpc_name}/subnet/public/{i}", pbs.subnet_id)
+#
