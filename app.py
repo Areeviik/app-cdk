@@ -23,7 +23,7 @@ max_azs = app.node.try_get_context("max_azs") or int(os.getenv("MAX_AZS") or 2)
 vpc_stack = VpcStack(app, "VPCStack","configs/network/vpc.yaml")
 
 # Security Group Stack
-# security_group_stack = SecurityGroupStack(app, "SecurityGroupStack", "configs/network/security_group.yaml")
+security_group_stack = SecurityGroupStack(app, "SecurityGroupStack", "configs/network/security_group.yaml")
 #
 # # ALB Stack
 # alb_stack = ALBStack(

@@ -31,16 +31,21 @@ class SecurityGroupStack(Stack):
         prj_name = config["project_name"]
         env_name = config["env"]
 
-        vpc_param_name = f"/{prj_name}/{env_name}/vpc/{config['vpc']}"
-        vpc_id = get_ssm_parameter(self, vpc_param_name)
-        vpc = ec2.Vpc.from_vpc_attributes(self, "Vpc",
-            vpc_id=vpc_id,
-            availability_zones=[az for az in config.get("availability_zones")],
-        )
-
         self.security_groups = {}
+        self.vpcs = {}
 
         for sg_conf in config.get("security_groups", []):
+            vpc_key = sg_conf["vpc"]
+            if vpc_key not in self.vpcs:
+                vpc_param_name = f"/{prj_name}/{env_name}/vpc/{vpc_key}"
+                vpc_id = get_ssm_parameter(self, vpc_param_name)
+                self.vpcs[vpc_key] = ec2.Vpc.from_vpc_attributes(
+                    self, f"VPC-{vpc_key}",
+                    vpc_id=vpc_id,
+                    availability_zones=[az for az in sg_conf.get("availability_zones")],
+                )
+            vpc = self.vpcs[vpc_key]
+
             sg_name = sg_conf["name"]
             sg_id = f"{prj_name}-{env_name}-{sg_name}-sg"
             description = sg_conf.get("description", "")
@@ -52,7 +57,6 @@ class SecurityGroupStack(Stack):
                 vpc,
                 description
             )
-
             self.security_groups[sg_name] = sg
 
             for rule in sg_conf.get("ingress", []):

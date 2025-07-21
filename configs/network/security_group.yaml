@@ -1,13 +1,13 @@
 project_name: shinecosucan
 env: test
-vpc: main
-availability_zones:
-  - eu-west-1a
-  - eu-west-1b
 
 security_groups:
   - name: alb-sg
     description: Security group for ALB
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
     allow_all_outbound: true
     ingress:
       - port: 80
@@ -21,6 +21,10 @@ security_groups:
 
   - name: frontend-sg
     description: Security group for frontend
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
     allow_all_outbound: true
     ingress:
       - port: -1
@@ -34,6 +38,10 @@ security_groups:
 
   - name: backend-sg
     description: Security group for backend
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
     allow_all_outbound: true
     ingress:
       - port: -1
@@ -51,6 +59,10 @@ security_groups:
 
   - name: db-sg
     description: Security group for PostgreSQL DB
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
     allow_all_outbound: true
     ingress:
       - port: 5432
