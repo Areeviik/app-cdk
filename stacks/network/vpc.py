@@ -29,7 +29,7 @@ class VpcStack(Stack):
 		vpc_configs = self.config.get("vpcs", [])
 
 		if not vpc_configs:
-			self.node.add_warning("No VPC configurations found in the YAML file.")
+			print("WARNING: No VPC configurations found in the YAML file.")
 			return
 
 		for vpc_cfg in vpc_configs:
@@ -56,8 +56,7 @@ class VpcStack(Stack):
 					cidr_mask=subnet.get("cidr_mask")
 				))
 			except AttributeError:
-				self.node.add_error(
-					f"Invalid SubnetType '{subnet['type']}' for VPC '{vpc_name_in_config}'. Must be PUBLIC, PRIVATE_WITH_EGRESS, or PRIVATE_ISOLATED.")
+				print(f"ERROR: Invalid SubnetType '{subnet['type']}' for VPC '{vpc_name_in_config}'. Must be PUBLIC, PRIVATE_WITH_EGRESS, or PRIVATE_ISOLATED.")
 				continue
 
 		nat_gateway_provider_type = vpc_cfg.get("nat_gateway_provider_type")
@@ -65,8 +64,7 @@ class VpcStack(Stack):
 		if nat_gateway_provider_type == "gateway_vnet":
 			nat_gateway_provider = ec2.NatProvider.gateway_vnet()
 		elif nat_gateway_provider_type == "instance":
-			self.node.add_warning(
-				f"Using NatProvider.instance() for VPC '{vpc_name_in_config}' requires 'instance_type' and 'machine_image' config for more robust solution. Using default.")
+			print(f"WARNING: Using NatProvider.instance() for VPC '{vpc_name_in_config}' requires 'instance_type' and 'machine_image' config for more robust solution. Using default.")
 			nat_gateway_provider = ec2.NatProvider.instance()
 
 		vpc = ec2.Vpc(
