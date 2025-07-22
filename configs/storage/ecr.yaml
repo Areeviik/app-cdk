@@ -2,5 +2,14 @@ project_name: shinecosucan
 env: test
 
 repositories:
-  - frontend
-  - backend
+  - name: frontend
+    image_scan_on_push: true
+    lifecycle_max: 5
+    repository_name: shinecosucan-test-frontend
+    store_ssm: true
+
+  - name: backend
+    image_scan_on_push: true
+    lifecycle_max: 10
+    store_ssm: true
+    ssm_param_name: /shinecosucan/test/ecr/backend-repo-uri

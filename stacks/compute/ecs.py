@@ -5,8 +5,8 @@ from aws_cdk import (
 	aws_iam as iam,
 	aws_logs as logs,
 	aws_elasticloadbalancingv2 as elb,
-	aws_secretsmanager as secretsmanager,
 	aws_autoscaling as autoscaling,
+	RemovalPolicy
 )
 from constructs import Construct
 from utils.yaml_loader import load_yaml
@@ -25,195 +25,129 @@ class ECSStack(Stack):
 		prj_name = config["project_name"]
 		env_name = config["env"]
 
-		public_subnet_ids = get_ssm_subnet_ids(
-			self, f"/{prj_name}/{env_name}/subnet/public", 2
-		)
+		for cluster_conf in config.get("clusters", []):
+			cluster_name = cluster_conf["name"]
+			vpc_name = cluster_conf["vpc"]
+			vpc_param_name = f"/{prj_name}/{env_name}/vpc/{vpc_name}"
+			vpc_id = get_ssm_parameter(self, vpc_param_name)
 
-		vpc_param_name = f"/{prj_name}/{env_name}/vpc/{config['vpc']}"
-		vpc_id = get_ssm_parameter(self, vpc_param_name)
-		vpc = ec2.Vpc.from_vpc_attributes(
-			self, "Vpc",
-			vpc_id=vpc_id,
-			availability_zones=[az for az in config.get("availability_zones")],
-			public_subnet_ids=public_subnet_ids,
-		)
-		backend_sg_id = get_ssm_parameter(self, f"/{prj_name}/{env_name}/sg/backend-sg")
+			public_subnet_ids = get_ssm_subnet_ids(
+				self, f"/{prj_name}/{env_name}/{vpc_name}/subnet/public", 2
+			)
 
-		backend_sg = ec2.SecurityGroup.from_security_group_id(self, "BackendSG", backend_sg_id)
+			vpc = ec2.Vpc.from_vpc_attributes(
+				self, f"{cluster_name}Vpc",
+				vpc_id=vpc_id,
+				availability_zones=cluster_conf.get("availability_zones", []),
+				public_subnet_ids=public_subnet_ids,
+			)
+			security_groups = []
+			for sg_name in cluster_conf.get("security_groups", []):
+				sg_id = get_ssm_parameter(self, f"/{prj_name}/{env_name}/sg/{sg_name}")
+				security_groups.append(ec2.SecurityGroup.from_security_group_id(self, f"SG-{sg_name}", sg_id))
 
-		frontend_tg_arn = get_ssm_parameter(self, f"/{prj_name}/{env_name}/targetgroup/frontend")
-		backend_tg_arn = get_ssm_parameter(self, f"/{prj_name}/{env_name}/targetgroup/backend")
+			cluster = ecs.Cluster(
+				self,"ECSCluster",
+				cluster_name=f"{prj_name}-{env_name}-{cluster_name}-cluster",
+				vpc=vpc,
+			)
 
-		frontend_tg = elb.ApplicationTargetGroup.from_target_group_attributes(self, "FrontendTG", target_group_arn=frontend_tg_arn)
-		backend_tg = elb.ApplicationTargetGroup.from_target_group_attributes(self, "BackendTG", target_group_arn=backend_tg_arn)
+			asg = autoscaling.AutoScalingGroup(
+				self, f"{cluster_name}ASG",
+				vpc=vpc,
+				instance_type=ec2.InstanceType(cluster_conf["instance_type"]),
+				machine_image=ecs.EcsOptimizedImage.amazon_linux2(),
+				min_capacity=cluster_conf["asg_min_capacity"],
+				max_capacity=cluster_conf["asg_max_capacity"],
+				desired_capacity=cluster_conf["asg_desired_capacity"],
+				associate_public_ip_address=True,
+				vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
+				security_group=security_groups[0] if security_groups else None
+			)
 
-		self.cluster = ecs.Cluster(
-			self,"ECSCluster",
-			cluster_name=f"{prj_name}-{env_name}-ecs-cluster",
-			vpc=vpc,
-		)
+			capacity_provider = ecs.AsgCapacityProvider(
+				self, f"{cluster_name}CapacityProvider",
+				auto_scaling_group=asg,
+				capacity_provider_name=f"{prj_name}-{env_name}-{cluster_name}-capacity-provider",
+			)
+			cluster.add_asg_capacity_provider(capacity_provider)
 
-		asg = autoscaling.AutoScalingGroup(
-			self, "ECSAutoScalingGroup",
-			vpc=vpc,
-			instance_type=ec2.InstanceType(config.get("instance_type")),
-			machine_image=ecs.EcsOptimizedImage.amazon_linux2(),
-			min_capacity=config.get("asg_min_capacity"),
-			max_capacity=config.get("asg_max_capacity"),
-			desired_capacity=config.get("asg_desired_capacity"),
-			associate_public_ip_address=True,
-			vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
-			security_group=backend_sg,
-		)
-
-		capacity_provider = ecs.AsgCapacityProvider(
-			self, "ECSCapacityProvider",
-			auto_scaling_group=asg,
-			capacity_provider_name=f"{prj_name}-{env_name}-capacity-provider",
-		)
-		self.cluster.add_asg_capacity_provider(capacity_provider)
-
-		ec2_role = iam.Role(
-			self, "EC2InstanceRole",
-			assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
-			description="ECS Task Execution Role"
-		)
-		ec2_role.add_managed_policy(
-			iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonEC2ContainerServiceforEC2Role")
-		)
-		execution_role = iam.Role(
-			self, "ExecutionRole",
-			assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
-			description="ECS Task Execution Role"
-		)
-		execution_role.add_managed_policy(
-			iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy")
-		)
-		execution_role.add_managed_policy(
-			iam.ManagedPolicy.from_aws_managed_policy_name("AmazonEC2ContainerRegistryReadOnly")
-		)
-
-		execution_role.add_to_policy(
-			iam.PolicyStatement(
+			ec2_role = iam.Role(
+				self, f"{cluster_name}EC2InstanceRole",
+				assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+				description="ECS Task Execution Role"
+			)
+			ec2_role.add_managed_policy(
+				iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonEC2ContainerServiceforEC2Role")
+			)
+			execution_role = iam.Role(
+				self, f"{cluster_name}ExecutionRole",
+				assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+				description="ECS Task Execution Role"
+			)
+			execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AmazonECSTaskExecutionRolePolicy"))
+			execution_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonEC2ContainerRegistryReadOnly"))
+			execution_role.add_to_policy(iam.PolicyStatement(
 				actions=["secretsmanager:GetSecretValue"],
 				resources=["*"]
-			)
-		)
+			))
 
-		services = config["services"]
-		self._create_frontend(prj_name, env_name, services["frontend"], frontend_tg, execution_role)
-		self._create_backend(prj_name, env_name, services["backend"], backend_tg, execution_role)
+			for svc_conf in cluster_conf.get("services", []):
+				self._create_service(prj_name, env_name, cluster, svc_conf, execution_role)
 
-	def _create_frontend(self, prj_name, env_name, config, tg, execution_role):
-		frontend_task_definition = ecs.TaskDefinition(
-			self, "FrontendTaskDefinition",
-			compatibility=ecs.Compatibility.EC2,
-			network_mode=ecs.NetworkMode.BRIDGE,
-			execution_role=execution_role,
-			cpu=str(config["cpu"]),
-			memory_mib=config["memory_mib"]
-		)
-
-		frontend_task_definition.add_container(
-			"Frontend",
-			image=ecs.ContainerImage.from_registry(config["image"]),
-			command=config.get("command"),
-			environment=config.get("environment"),
-			logging=ecs.LogDriver.aws_logs(
-				stream_prefix="frontend",
-				log_group=logs.LogGroup(
-					self, "FrontendLogGroup",
-					log_group_name=f"{prj_name}-{env_name}-frontend-logs"
-				)
-			),
-			port_mappings=[ecs.PortMapping(
-				container_port=config["port"],
-				host_port=config["port"],
-				protocol=ecs.Protocol.TCP
-			)]
-		)
-
-		self.frontend_service = ecs.CfnService(
-			self, "FrontendService",
-			cluster=self.cluster.cluster_name,
-			service_name=f"{prj_name}-{env_name}-frontend-service",
-			task_definition=frontend_task_definition.task_definition_arn,
-			launch_type="EC2",
-			scheduling_strategy="DAEMON",
-			load_balancers=[ecs.CfnService.LoadBalancerProperty(
-				target_group_arn=tg.target_group_arn,
-				container_name="Frontend",
-				container_port=config["port"]
-			)]
-		)
-
-	def _create_backend(self, prj_name, env_name, config, tg, execution_role):
-		rds_secret = secretsmanager.Secret.from_secret_name_v2(
-			self, "RDSSecret", f"{prj_name}/{env_name}/rds-credentials"
-		)
+	def _create_service(self, prj_name, env_name, cluster, config, execution_role):
+		service_name = config["name"]
+		containers = config.get("containers") or [
+			{
+				"name": service_name,
+				"image": config["image"],
+				"command": config.get("command"),
+				"environment": config.get("environment")
+			}
+		]
 
 		task_def = ecs.TaskDefinition(
-			self, "BackendTaskDefinition",
+			self, f"{service_name}TaskDef",
 			compatibility=ecs.Compatibility.EC2,
 			network_mode=ecs.NetworkMode.BRIDGE,
 			execution_role=execution_role,
 			cpu=str(config["cpu"]),
 			memory_mib=config["memory_mib"]
 		)
-		app_conf = config["containers"]["app"]
-
-		task_def.add_container(
-			"Backend",
-			image=ecs.ContainerImage.from_registry(app_conf["image"]),
-			command=["npm", "run", "start:server"],
-			environment=config.get("environment"),
-			secrets={
-				"DB_HOST": ecs.Secret.from_secrets_manager(rds_secret, "host"),
-				"DB_PASSWORD": ecs.Secret.from_secrets_manager(rds_secret, "password"),
-			},
-			logging=ecs.LogDriver.aws_logs(
-				stream_prefix="backend",
-				log_group=logs.LogGroup(
-					self, "BackendLogGroup",
-					log_group_name=f"{prj_name}-{env_name}-backend-logs"
-				)
-			),
-			port_mappings=[ecs.PortMapping(
-				container_port=config["port"],
-				host_port=config["port"],
-				protocol=ecs.Protocol.TCP
-			)]
-		)
-
-		worker_conf = config["containers"]["worker"]
-		task_def.add_container(
-			"Worker",
-			image=ecs.ContainerImage.from_registry(worker_conf["image"]),
-			essential=False,
-			command=["npm", "run", "start:worker"],
-			environment=config.get("environment"),
-			secrets={
-				"DB_HOST": ecs.Secret.from_secrets_manager(rds_secret, "host"),
-				"DB_PASSWORD": ecs.Secret.from_secrets_manager(rds_secret, "password"),
-			},
-			logging=ecs.LogDriver.aws_logs(
-				stream_prefix="ecs",
-				log_group=logs.LogGroup.from_log_group_name(
-					self, "WorkerLogGroup", f"/ecs/{prj_name}-{env_name}-ecs-tf-backend"
-				)
+		for container_index, container_conf in enumerate(containers):
+			container = task_def.add_container(
+				container_conf["name"],
+				image=ecs.ContainerImage.from_registry(container_conf["image"]),
+				command=container_conf.get("command"),
+				environment=container_conf.get("environment"),
+				logging=ecs.LogDriver.aws_logs(
+					stream_prefix=container_conf["name"],
+					log_group=logs.LogGroup(
+						self, f"{container_conf["name"]}LogGroup",
+						log_group_name=f"{prj_name}-{env_name}-{container_conf['name']}-logs",
+						removal_policy = RemovalPolicy.DESTROY
 			)
-		)
+				),
+				port_mappings=[ecs.PortMapping(
+					container_port=config["port"],
+					host_port=config["port"],
+					protocol=ecs.Protocol.TCP
+				)] if container_index == 0 else None
+			)
+		tg_arn = get_ssm_parameter(self, f"/{prj_name}/{env_name}/targetgroup/{config["tg_name"]}")
 
-		self.backend_service = ecs.CfnService(
-			self, "BackendService",
-			cluster=self.cluster.cluster_name,
-			service_name=f"{prj_name}-{env_name}-backend-service",
+		tg = elb.ApplicationTargetGroup.from_target_group_attributes(self, f"{tg_arn}TG", target_group_arn=tg_arn)
+		main_container_name = containers[0]["name"]
+		service = ecs.CfnService(
+			self, f"{service_name}Service",
+			cluster=cluster.cluster_name,
+			service_name=f"{prj_name}-{env_name}-{service_name}-service",
 			task_definition=task_def.task_definition_arn,
 			launch_type="EC2",
 			scheduling_strategy="DAEMON",
 			load_balancers=[ecs.CfnService.LoadBalancerProperty(
 				target_group_arn=tg.target_group_arn,
-				container_name="Backend",
+				container_name=main_container_name,
 				container_port=config["port"]
 			)]
 		)

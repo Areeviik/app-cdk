@@ -34,40 +34,40 @@ alb_stack = ALBStack(
 		region=os.getenv("CDK_DEFAULT_REGION")
 	)
 )
-#
-# # RDS Stack
-# rds_stack = RDSStack(
-# 	app, "RDSStack",
-# 	"configs/storage/rds.yaml")
-#
-# # S3 Bucket Stack
-# s3_bucket_stack = S3BucketStack(
-# 	app, "S3BucketStack",
-# 	"configs/storage/s3.yaml",
-# 	env=Environment(
-# 		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
-# 		region=os.getenv("CDK_DEFAULT_REGION")
-# 	)
-# )
-#
-# # ECR Stack
-# ecr_stack = ECRStack(app, "ECRStack",
-# 	config_path="configs/storage/ecr.yaml",
-# 	env=Environment(
-# 		account=os.getenv('CDK_DEFAULT_ACCOUNT'),
-# 		region=os.getenv('CDK_DEFAULT_REGION'))
-# )
-#
-# # ECS Stack
-# ecs_stack = ECSStack(
-# 	app, "ECSStack",
-# 	config_path="configs/compute/ecs.yaml",
-# 	env=Environment(
-# 		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
-# 		region=os.getenv("CDK_DEFAULT_REGION")
-# 	)
-# )
-#
+
+# RDS Stack
+rds_stack = RDSStack(
+	app, "RDSStack",
+	"configs/storage/rds.yaml")
+
+# S3 Bucket Stack
+s3_bucket_stack = S3BucketStack(
+	app, "S3BucketStack",
+	"configs/storage/s3.yaml",
+	env=Environment(
+		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+		region=os.getenv("CDK_DEFAULT_REGION")
+	)
+)
+
+# ECR Stack
+ecr_stack = ECRStack(app, "ECRStack",
+	config_path="configs/storage/ecr.yaml",
+	env=Environment(
+		account=os.getenv('CDK_DEFAULT_ACCOUNT'),
+		region=os.getenv('CDK_DEFAULT_REGION'))
+)
+
+# ECS Stack
+ecs_stack = ECSStack(
+	app, "ECSStack",
+	config_path="configs/compute/ecs.yaml",
+	env=Environment(
+		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+		region=os.getenv("CDK_DEFAULT_REGION")
+	)
+)
+
 # # CodePipeline Stack
 # code_pipeline_backend_stack = CodePipelineStack(
 # 	app, "CodePipelineStack",

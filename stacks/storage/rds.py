@@ -3,19 +3,10 @@ from aws_cdk import (
 	aws_rds as rds,
 	aws_ec2 as ec2,
 	aws_secretsmanager as secretsmanager,
-	aws_ssm as ssm
 )
 from constructs import Construct
-from utils.ssm import get_ssm_parameter
-from utils.ssm import put_ssm_parameter
+from utils.ssm import get_ssm_parameter, put_ssm_parameter, get_ssm_subnet_ids
 from utils.yaml_loader import load_yaml
-
-def get_ssm_subnet_ids(scope: Construct, base_path: str, count: int) -> list[str]:
-	return [
-		ssm.StringParameter.value_for_string_parameter(
-			scope, f"{base_path}/{i}"
-		) for i in range(count)
-	]
 
 class RDSStack(Stack):
 	def __init__(self, scope: Construct, construct_id: str, config_path, **kwargs) -> None:
@@ -24,33 +15,35 @@ class RDSStack(Stack):
 		config = load_yaml(config_path)
 		prj_name = config["project_name"]
 		env_name = config["env"]
-		public_subnet_ids = get_ssm_subnet_ids(
-			self, f"/{prj_name}/{env_name}/subnet/public", 2
-		)
-
-		vpc_param = f"/{prj_name}/{env_name}/vpc/{config['vpc']}"
-		vpc_id = get_ssm_parameter(self, vpc_param)
-		vpc = ec2.Vpc.from_vpc_attributes(
-			self,
-			"Vpc",
-			vpc_id=vpc_id,
-			availability_zones=[az for az in config.get("availability_zones")],
-			public_subnet_ids=public_subnet_ids,
-		)
-
-		db_sg_param = f"/{prj_name}/{env_name}/sg/db-sg"
-		db_sg_id = get_ssm_parameter(self, db_sg_param)
-		db_sg = ec2.SecurityGroup.from_security_group_id(self, "DBSG", db_sg_id)
 
 		for db in config["instances"]:
 			name = db["name"]
 			dbname = db["db_name"]
 			uname = db["username"]
+			engine_version = db.get("engine_version", "VER_17")
+			vpc = db["vpc"]
+			subnet_type = db["subnet_type"]
+			azs = db.get("availability_zones", [])
+			sg_name = db["security_group_name"]
+			parameters = db.get("parameter_group", {})
+
+			vpc_param = f"/{prj_name}/{env_name}/vpc/{vpc}"
+			vpc_id = get_ssm_parameter(self, vpc_param)
+			subnet_ids = get_ssm_subnet_ids(self, f"/{prj_name}/{env_name}/{vpc}/subnet/{subnet_type.lower()}", len(azs))
+			sg_id = get_ssm_parameter(self, f"/{prj_name}/{env_name}/sg/{sg_name}")
+			vpc = ec2.Vpc.from_vpc_attributes(
+				self,
+				f"{name}-vpc",
+				vpc_id=vpc_id,
+				availability_zones=azs,
+				public_subnet_ids=subnet_ids if subnet_type == "PUBLIC" else None,
+			)
+			db_sg = ec2.SecurityGroup.from_security_group_id(self, f"{name}-sg", sg_id)
 
 			db_secret = secretsmanager.Secret(
 				self,
 				f"{name}-secret",
-				secret_name=f"{prj_name}/{env_name}/rds-credentials",
+				secret_name=f"{prj_name}/{env_name}/rds/{name}/credentials",
 				generate_secret_string=secretsmanager.SecretStringGenerator(
 					secret_string_template=f'{{"username":"{uname}"}}',
 					generate_string_key="password",
@@ -63,9 +56,9 @@ class RDSStack(Stack):
 			param_group = rds.ParameterGroup(
 				self, f"{name}-params",
 				engine=rds.DatabaseInstanceEngine.postgres(
-					version=rds.PostgresEngineVersion.VER_17
+					version=rds.PostgresEngineVersion.of(engine_version, engine_version)
 				),
-				parameters={"rds.force_ssl": "0"}
+				parameters=parameters,
 			)
 
 			instance = rds.DatabaseInstance(
@@ -73,7 +66,7 @@ class RDSStack(Stack):
 				f"{name}-rds",
 				instance_identifier=name,
 				engine=rds.DatabaseInstanceEngine.postgres(
-					version=rds.PostgresEngineVersion.VER_17
+					version=rds.PostgresEngineVersion.of(engine_version, engine_version)
 				),
 				credentials=rds.Credentials.from_secret(db_secret),
 				instance_type=ec2.InstanceType.of(
@@ -81,7 +74,7 @@ class RDSStack(Stack):
 					getattr(ec2.InstanceSize, db["instance_size"]),
 				),
 				vpc=vpc,
-				vpc_subnets={"subnet_type": getattr(ec2.SubnetType, db["subnet_type"])},
+				vpc_subnets={"subnet_type": getattr(ec2.SubnetType, subnet_type)},
 				security_groups=[db_sg],
 				multi_az=db["multi_az"],
 				storage_encrypted=db["storage_encrypted"],

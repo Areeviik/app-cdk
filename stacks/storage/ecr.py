@@ -4,6 +4,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 from utils.yaml_loader import load_yaml
+from utils.ssm import put_ssm_parameter
 
 class ECRStack(Stack):
 	def __init__(self, scope: Construct, construct_id: str, config_path: str, **kwargs) -> None:
@@ -16,15 +17,28 @@ class ECRStack(Stack):
 		repo_names = config.get("repositories", [])
 		self.repositories = {}
 
-		for name in repo_names:
+		for repo_cfg in repo_names:
+			if isinstance(repo_cfg, str):
+				repo_cfg = {"name": repo_cfg}
+
+			name = repo_cfg["name"]
+			repo_id = name.replace("-", "").capitalize() + "ECR"
+			repo_name = repo_cfg.get("repository_name", f"{prj_name}-{env_name}-{name}")
+			lifecycle_max = repo_cfg.get("lifecycle_max", 10)
+			image_scan = repo_cfg.get("image_scan_on_push", True)
+			store_ssm = repo_cfg.get("store_ssm", True)
+			ssm_param_name = repo_cfg.get("ssm_param_name", f"/{prj_name}/{env_name}/ecr/{name}-repository-uri")
+
 			repo = ecr.Repository(
 				self,
-				f"{name}repo",
-				repository_name=f"{prj_name}-{env_name}-{name}",
+				repo_id,
+				repository_name=repo_name,
 				lifecycle_rules=[
-					ecr.LifecycleRule(max_image_count=10)
+					ecr.LifecycleRule(max_image_count=lifecycle_max)
 				],
-				image_scan_on_push=True,
+				image_scan_on_push=image_scan,
 			)
 			self.repositories[name] = repo
 
+			if store_ssm:
+				put_ssm_parameter(self, ssm_param_name, repo.repository_uri)
