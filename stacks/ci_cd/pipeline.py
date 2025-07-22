@@ -24,24 +24,22 @@ class CodePipelineStack(Stack):
         self.prj_name = self.config["project_name"]
         self.env_name = self.config["env"]
 
-        self.artifact_bucket = s3.Bucket.from_bucket_name(
-            self, "ArtifactBucket", self.config["artifact_bucket"]
-        )
-        self.github_token = self._get_github_token()
-
         for svc_name, svc_conf in self.config.get("pipelines", {}).items():
             self._create_service_pipeline(svc_name, svc_conf)
 
-    def _get_github_token(self) -> str:
+    def _get_github_token(self, pipeline_name: str) -> str:
         """Retrieves the GitHub token from Secrets Manager."""
         github_token_secret = sm.Secret.from_secret_name_v2(
-            self, "GitHubToken", f"{self.prj_name}/{self.env_name}/github-token"
+            self, f"{pipeline_name}GitHubToken", f"{self.prj_name}/{self.env_name}/github-token"
         )
         return github_token_secret.secret_value_from_json("github-token")
 
     def _create_service_pipeline(self, svc_name: str, svc_conf: Dict[str, Any]):
         """Creates a CodePipeline for a given service."""
         vpc = self._get_vpc(svc_name, svc_conf["vpc"], svc_conf.get("availability_zones", []))
+        artifact_bucket = s3.Bucket.from_bucket_name(self, f"{svc_name.capitalize()}ArtifactBucket", svc_conf["artifact_bucket"])
+        github_token = self._get_github_token(svc_name)
+        github_username = svc_conf["github_username"]
         repo = svc_conf["repo"]
         branch = svc_conf["branch"]
         cache_prefix = svc_conf["build_cache_prefix"]
@@ -49,13 +47,13 @@ class CodePipelineStack(Stack):
         ecs_cluster_name = svc_conf["ecs_cluster_name"]
 
         build_project = self._create_codebuild_project(svc_name, cache_prefix,
-                                                           svc_conf.get("codebuild_policy_statements", []))
+                                                           svc_conf.get("codebuild_policy_statements", []), artifact_bucket)
 
         pipeline = codepipeline.Pipeline(
             self,
             f"{svc_name.capitalize()}Pipeline",
             pipeline_name=f"{self.prj_name}-{self.env_name}-{svc_name}-pipeline",
-            artifact_bucket=self.artifact_bucket,
+            artifact_bucket=artifact_bucket,
             restart_execution_on_update=False,
         )
 
@@ -88,10 +86,10 @@ class CodePipelineStack(Stack):
                     branch,
                     source_output,
                     build_output,
-                    self.github_token,
+                    github_token,
                     build_project,
                     service,
-                    self.config["github_username"]
+                    github_username
                 )
                 if action:
                     actions_list.append(action)
@@ -120,7 +118,8 @@ class CodePipelineStack(Stack):
     def _create_codebuild_project(
             self, svc_name: str,
             cache_prefix: str,
-            policy_statements_config: List[Dict[str, Any]]
+            policy_statements_config: List[Dict[str, Any]],
+            artifact_bucket: s3.IBucket
     ) -> codebuild.PipelineProject:
         """Creates a CodeBuild project and attaches policies."""
         build_project = codebuild.PipelineProject(
@@ -130,7 +129,7 @@ class CodePipelineStack(Stack):
             environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0, privileged=True
             ),
-            cache=codebuild.Cache.bucket(self.artifact_bucket, prefix=cache_prefix),
+            cache=codebuild.Cache.bucket(artifact_bucket, prefix=cache_prefix),
             build_spec=codebuild.BuildSpec.from_source_filename("buildspec.yml"),
         )
         for policy_conf in policy_statements_config:

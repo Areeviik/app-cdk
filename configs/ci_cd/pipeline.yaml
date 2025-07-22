@@ -1,15 +1,14 @@
 project_name: shinecosucan
 env: test
 
-github_username: Areeviik
-artifact_bucket: "shinecosucan-test-artifacts"
-
 pipelines:
   frontend:
     vpc: main
     availability_zones:
       - eu-west-1a
       - eu-west-1b
+    artifact_bucket: "shinecosucan-test-artifacts"
+    github_username: Areeviik
     repo: app-frontend
     branch: main
     build_cache_prefix: "frontend-codebuild-cache"
@@ -64,6 +63,8 @@ pipelines:
     availability_zones:
       - eu-west-1a
       - eu-west-1b
+    artifact_bucket: "shinecosucan-test-artifacts"
+    github_username: Areeviik
     repo: app-backend
     branch: main
     build_cache_prefix: "codebuild-cache"
