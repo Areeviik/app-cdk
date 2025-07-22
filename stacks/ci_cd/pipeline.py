@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_ecs as ecs,
     aws_ec2 as ec2,
+    aws_lambda as lambda_,
 )
 from constructs import Construct
 from typing import cast, Dict, Any, List
@@ -181,6 +182,43 @@ class CodePipelineStack(Stack):
                 action_name=action_name,
                 service=ecs_service,
                 input=build_output,
+            )
+        elif action_type == "s3_deploy":
+            target_bucket_name = action_conf.get("target_bucket_name")
+            if not target_bucket_name:
+                self.node.add_error(f"S3 Deploy Action '{action_name}' requires 'target_bucket_name' in config.")
+                return None
+
+            target_bucket = s3.Bucket.from_bucket_name(self, f"{svc_name}S3DeployBucket", target_bucket_name)
+
+            return cpactions.S3DeployAction(
+                action_name=action_name,
+                input=build_output,
+                bucket=target_bucket,
+                extract=action_conf.get("extract", True),
+                object_key=action_conf.get("object_key"),
+                access_control=getattr(s3.BucketAccessControl, action_conf.get("access_control", "NO_ACL").upper()),
+            )
+        elif action_type == "manual_approval":
+            return cpactions.ManualApprovalAction(
+                action_name=action_name,
+                notification_topic=None,
+                external_providers=[action_conf["external_provider"]] if action_conf.get("external_provider") else None,
+                additional_information=action_conf.get("message"),
+            )
+        elif action_type == "lambda_invoke":
+            lambda_function_arn = action_conf.get("lambda_function_arn")
+            if not lambda_function_arn:
+                self.node.add_error(f"Lambda Invoke Action '{action_name}' requires 'lambda_function_arn' in config.")
+                return None
+
+            lambda_function = lambda_.Function.from_function_arn(self, f"{svc_name}LambdaFunc", lambda_function_arn)
+
+            return cpactions.LambdaInvokeAction(
+                action_name=action_name,
+                lambda_function=lambda_function,
+                user_parameters=action_conf.get("user_parameters"),
+                variables_namespace=action_conf.get("variables_namespace"),
             )
         else:
             self.node.add_warning(f"Unsupported action type: {action_type}")
