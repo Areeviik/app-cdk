@@ -37,7 +37,13 @@ pipelines:
           - logs:CreateLogGroup
           - logs:CreateLogStream
           - logs:PutLogEvents
-        resources: ["*"]
+        resources: [
+          "arn:aws:ecs:eu-west-1:577638398727:cluster/shinecosucan-test-main-cluster",
+          "arn:aws:ecs:eu-west-1:577638398727:service/shinecosucan-test-main-cluster/shinecosucan-test-Frontend-service",
+          "arn:aws:ecr:eu-west-1:577638398727:repository/shinecosucan-test-frontend",
+          "arn:aws:s3:::shinecosucan-test-artifacts",
+          "arn:aws:logs:eu-west-1:577638398727:log-group:/aws/codebuild/shinecosucan-test-frontend-build:*"
+        ]
         effect: ALLOW
     stages:
       - name: Source
@@ -81,7 +87,14 @@ pipelines:
           - logs:CreateLogGroup
           - logs:CreateLogStream
           - logs:PutLogEvents
-        resources: ["*"]
+        resources: [
+          "arn:aws:ecs:eu-west-1:577638398727:cluster/shinecosucan-test-main-cluster",
+          "arn:aws:ecs:eu-west-1:577638398727:service/shinecosucan-test-main-cluster/shinecosucan-test-backend-service",
+          "arn:aws:ecr:eu-west-1:577638398727:repository/shinecosucan-test-backend",
+          "arn:aws:s3:::shinecosucan-test-artifacts",
+          "arn:aws:logs:eu-west-1:577638398727:log-group:/aws/codebuild/shinecosucan-test-backend-build:*",
+          "arn:aws:secretsmanager:eu-west-1:577638398727:secret:shinecosucan/test/rds/vendure-db/credentials-foD7pqZz"
+        ]
         effect: ALLOW
     stages:
       - name: Source
