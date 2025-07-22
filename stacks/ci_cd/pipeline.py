@@ -27,26 +27,10 @@ class CodePipelineStack(Stack):
         self.artifact_bucket = s3.Bucket.from_bucket_name(
             self, "ArtifactBucket", self.config["artifact_bucket"]
         )
-        self.vpc = self._get_vpc()
         self.github_token = self._get_github_token()
 
         for svc_name, svc_conf in self.config.get("pipelines", {}).items():
             self._create_service_pipeline(svc_name, svc_conf)
-
-    def _get_vpc(self) -> ec2.IVpc:
-        """Retrieves the VPC based on config."""
-        public_subnet_ids = get_ssm_subnet_ids(
-            self, f"/{self.prj_name}/{self.env_name}/{self.config['vpc']}/subnet/public", 2
-        )
-        vpc_param = f"/{self.prj_name}/{self.env_name}/vpc/{self.config['vpc']}"
-        vpc_id = get_ssm_parameter(self, vpc_param)
-        return ec2.Vpc.from_vpc_attributes(
-            self,
-            f"{vpc_id}Vpc",
-            vpc_id=vpc_id,
-            availability_zones=[az for az in self.config.get("availability_zones")],
-            public_subnet_ids=public_subnet_ids,
-        )
 
     def _get_github_token(self) -> str:
         """Retrieves the GitHub token from Secrets Manager."""
@@ -57,6 +41,7 @@ class CodePipelineStack(Stack):
 
     def _create_service_pipeline(self, svc_name: str, svc_conf: Dict[str, Any]):
         """Creates a CodePipeline for a given service."""
+        vpc = self._get_vpc(svc_name, svc_conf["vpc"], svc_conf.get("availability_zones", []))
         repo = svc_conf["repo"]
         branch = svc_conf["branch"]
         cache_prefix = svc_conf["build_cache_prefix"]
@@ -81,7 +66,7 @@ class CodePipelineStack(Stack):
             self,
             f"{svc_name.capitalize()}Cluster",
             cluster_name=ecs_cluster_name,
-            vpc=self.vpc,
+            vpc=vpc,
             security_groups=[],
         )
 
@@ -116,6 +101,21 @@ class CodePipelineStack(Stack):
                     stage_name=stage_name,
                     actions=cast(list[IAction], actions_list),
                 )
+
+    def _get_vpc(self, pipeline_name: str, vpc_name:str, azs:list) -> ec2.IVpc:
+        """Retrieves the VPC based on config."""
+        public_subnet_ids = get_ssm_subnet_ids(
+            self, f"/{self.prj_name}/{self.env_name}/{vpc_name}/subnet/public", 2
+        )
+        vpc_param = f"/{self.prj_name}/{self.env_name}/vpc/{vpc_name}"
+        vpc_id = get_ssm_parameter(self, vpc_param)
+        return ec2.Vpc.from_vpc_attributes(
+            self,
+            f"{pipeline_name}Vpc",
+            vpc_id=vpc_id,
+            availability_zones=[az for az in azs],
+            public_subnet_ids=public_subnet_ids,
+        )
 
     def _create_codebuild_project(
             self, svc_name: str,
