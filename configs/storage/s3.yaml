@@ -6,8 +6,10 @@ buckets:
     access_control: BUCKET_OWNER_FULL_CONTROL
     encryption: S3_MANAGED
     public_block: true
+    block_public_acls: True
 
   - name: frontend
     access_control: BUCKET_OWNER_FULL_CONTROL
     encryption: S3_MANAGED
     public_block: true
+    block_public_policy: True

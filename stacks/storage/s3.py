@@ -32,7 +32,12 @@ class S3BucketStack(Stack):
                 bucket_name=full_bucket_name,
                 access_control=access_control,
                 encryption=encryption,
-                block_public_access=get_block_public_access(block_public),
+                block_public_access=s3.BlockPublicAccess(
+                    block_public_acls=bucket_cfg.get("block_public_acls", True),
+                    block_public_policy= bucket_cfg.get("block_public_policy", True),
+                    ignore_public_acls=bucket_cfg.get("ignore_public_acls", True),
+                    restrict_public_buckets= bucket_cfg.get("restrict_public_buckets", True)
+                ),
                 removal_policy=RemovalPolicy.DESTROY,
                 auto_delete_objects=True,
             )
