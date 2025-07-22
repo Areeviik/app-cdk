@@ -2,7 +2,7 @@ project_name: shinecosucan
 env: test
 
 albs:
-  - name: app-alb
+  - name: main-alb
     vpc: main
     availability_zones:
       - eu-west-1a
@@ -17,14 +17,14 @@ albs:
         path: /health
     sg: alb-sg
 
-  - name: admin-alb
-    vpc: main
-    availability_zones:
-      - eu-west-1a
-      - eu-west-1b
-    domain_name: dev.yospace.ai
-    subdomains:
-      - name: shinecosucan-test
-        port: 3000
-        path: /health
-    sg: alb-sg
+#  - name: admin-alb
+#    vpc: main
+#    availability_zones:
+#      - eu-west-1a
+#      - eu-west-1b
+#    domain_name: dev.yospace.ai
+#    subdomains:
+#      - name: shinecosucan-test
+#        port: 3000
+#        path: /health
+#    sg: alb-sg

@@ -36,7 +36,7 @@ class ALBStack(Stack):
 					availability_zones=[az for az in alb_conf.get("availability_zones")],
 					public_subnet_ids=get_ssm_subnet_ids(
 						self,
-						f"/{prj_name}/{env_name}/vpc/{vpc_key}/public_subnets",
+						f"/{prj_name}/{env_name}/{vpc_key}/subnet/public",
 						len(alb_conf.get("availability_zones", []))
 					),
 				)
@@ -99,7 +99,7 @@ class ALBStack(Stack):
 				tg = elb.ApplicationTargetGroup(
 					self,
 					f"{alb_name}-TG-{i}",
-					target_group_name=f"{alb_name}-{subdomain_conf['name']}tg",
+					target_group_name=f"{alb_name}-{subdomain_conf['name']}-tg",
 					vpc=vpc,
 					port=port,
 					protocol=elb.ApplicationProtocol.HTTP,
