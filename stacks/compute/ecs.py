@@ -6,6 +6,7 @@ from aws_cdk import (
 	aws_logs as logs,
 	aws_elasticloadbalancingv2 as elb,
 	aws_autoscaling as autoscaling,
+	aws_secretsmanager as secretsmanager,
 	RemovalPolicy
 )
 from constructs import Construct
@@ -95,6 +96,18 @@ class ECSStack(Stack):
 			for svc_conf in cluster_conf.get("services", []):
 				self._create_service(prj_name, env_name, cluster, svc_conf, execution_role)
 
+	def parse_container_secrets(self, secret_definitions: dict, container_name: str) -> dict:
+		secrets = {}
+		for env_key, secret_info in secret_definitions.items():
+			construct_id = f"Secret{container_name.capitalize()}{env_key.upper()}"
+			secret = secretsmanager.Secret.from_secret_name_v2(
+				self, construct_id, secret_info["secret_name"]
+			)
+			secrets[env_key] = ecs.Secret.from_secrets_manager(
+				secret, field=secret_info["json_key"]
+			)
+		return secrets
+
 	def _create_service(self, prj_name, env_name, cluster, config, execution_role):
 		service_name = config["name"]
 		containers = config.get("containers") or [
@@ -115,11 +128,13 @@ class ECSStack(Stack):
 			memory_mib=config["memory_mib"]
 		)
 		for container_index, container_conf in enumerate(containers):
+			container_secrets = self.parse_container_secrets(container_conf.get("secrets", {}), container_conf["name"]) if container_conf.get("secrets") else {}
 			container = task_def.add_container(
 				container_conf["name"],
 				image=ecs.ContainerImage.from_registry(container_conf["image"]),
 				command=container_conf.get("command"),
 				environment=container_conf.get("environment"),
+				secrets = container_secrets,
 				logging=ecs.LogDriver.aws_logs(
 					stream_prefix=container_conf["name"],
 					log_group=logs.LogGroup(

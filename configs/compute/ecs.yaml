@@ -13,7 +13,7 @@ clusters:
     asg_desired_capacity: 2
     security_groups: [backend-sg]
     services:
-      - name: frontend
+      - name: Frontend
         image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-frontend:latest"
         cpu: 512
         memory_mib: "916"
@@ -29,7 +29,7 @@ clusters:
         port: 3000
         tg_name: main-alb-shinecosucan-admin
         containers:
-          - name: app
+          - name: Backend
             image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-backend:latest"
             command: ["npm", "run", "start:server"]
             environment:
@@ -43,6 +43,13 @@ clusters:
               ADMIN_API_PORT: "443"
               COOKIE_SECRET: "5J6d2Llv0zkXsucalhIVnw"
               PORT: "3000"
+            secrets:
+              DB_HOST:
+                secret_name: "shinecosucan/test/rds/vendure-db/credentials"
+                json_key: "host"
+              DB_PASSWORD:
+                secret_name: "shinecosucan/test/rds/vendure-db/credentials"
+                json_key: "password"
 
           - name: worker
             image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-backend:latest"
@@ -52,3 +59,10 @@ clusters:
               DB_NAME: "vendure"
               DB_PORT: "5432"
               APP_ENV: "dev"
+            secrets:
+              DB_HOST:
+                secret_name: "shinecosucan/test/rds/vendure-db/credentials"
+                json_key: "host"
+              DB_PASSWORD:
+                secret_name: "shinecosucan/test/rds/vendure-db/credentials"
+                json_key: "password"

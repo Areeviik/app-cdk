@@ -13,10 +13,86 @@ pipelines:
     repo: app-frontend
     branch: main
     build_cache_prefix: "frontend-codebuild-cache"
-    ecs_service_name: "shinecosucan-test-frontend-service"
-
+    ecs_cluster_name: "shinecosucan-test-main-cluster"
+    ecs_service_name: "shinecosucan-test-Frontend-service"
+    codebuild_policy_statements:
+      - actions:
+          - ecs:DescribeServices
+          - ecs:UpdateService
+          - ecs:RegisterTaskDefinition
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:CompleteLayerUpload
+          - ecr:GetDownloadUrlForLayer
+          - ecr:BatchGetImage
+          - ecr:InitiateLayerUpload
+          - ecr:PutImage
+          - ecr:UploadLayerPart
+          - secretsmanager:GetSecretValue
+          - s3:GetBucketAcl
+          - s3:GetBucketLocation
+          - s3:PutObject
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        resources: ["*"]
+        effect: ALLOW
+    stages:
+      - name: Source
+        actions:
+          - type: github_source
+            action_name: GitHub_Source
+      - name: Build
+        actions:
+          - type: codebuild
+            action_name: Frontend_Build
+      - name: Deploy
+        actions:
+          - type: ecs_deploy
+            action_name: Frontend_Deploy
+            deployment_vpc: false
   backend:
     repo: app-backend
     branch: main
     build_cache_prefix: "codebuild-cache"
+    ecs_cluster_name: "shinecosucan-test-main-cluster"
     ecs_service_name: "shinecosucan-test-backend-service"
+    codebuild_policy_statements:
+      - actions:
+          - ecs:DescribeServices
+          - ecs:UpdateService
+          - ecs:RegisterTaskDefinition
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:CompleteLayerUpload
+          - ecr:GetDownloadUrlForLayer
+          - ecr:BatchGetImage
+          - ecr:InitiateLayerUpload
+          - ecr:PutImage
+          - ecr:UploadLayerPart
+          - secretsmanager:GetSecretValue
+          - s3:GetBucketAcl
+          - s3:GetBucketLocation
+          - s3:PutObject
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        resources: ["*"]
+        effect: ALLOW
+    stages:
+      - name: Source
+        actions:
+          - type: github_source
+            action_name: GitHub_Source
+      - name: Build
+        actions:
+          - type: codebuild
+            action_name: Backend_Build
+      - name: Deploy
+        actions:
+          - type: ecs_deploy
+            action_name: Backend_Deploy

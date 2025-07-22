@@ -68,14 +68,14 @@ ecs_stack = ECSStack(
 	)
 )
 
-# # CodePipeline Stack
-# code_pipeline_backend_stack = CodePipelineStack(
-# 	app, "CodePipelineStack",
-# 	config_path="configs/ci_cd/pipeline.yaml",
-# 	env=Environment(
-# 		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
-# 		region=os.getenv("CDK_DEFAULT_REGION")
-# 	)
-# )
+# CodePipeline Stack
+code_pipeline_backend_stack = CodePipelineStack(
+	app, "CodePipelineStack",
+	config_path="configs/ci_cd/pipeline.yaml",
+	env=Environment(
+		account=os.getenv("CDK_DEFAULT_ACCOUNT"),
+		region=os.getenv("CDK_DEFAULT_REGION")
+	)
+)
 
 app.synth()
