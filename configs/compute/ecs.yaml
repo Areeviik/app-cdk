@@ -62,7 +62,7 @@ clusters:
               removal_policy: DESTROY
             container_health_check:
               enabled: true
-              command: [ "CMD-SHELL", "curl -f http://localhost:8002/health || exit 1" ]
+              command: [ "CMD-SHELL", "curl -f http://localhost:8002/ || exit 1" ]
               interval_seconds: 30
               timeout_seconds: 5
               retries: 3
