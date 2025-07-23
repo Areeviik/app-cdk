@@ -4,7 +4,7 @@ env: test
 repositories:
   - name: frontend
     image_scan_on_push: true
-    image_tag_mutability: IMMUTABLE
+    image_tag_mutability: MUTABLE
     removal_policy: DESTROY
     auto_delete_images: true
     lifecycle_rules:
@@ -16,7 +16,7 @@ repositories:
 
   - name: backend
     image_scan_on_push: true
-    image_tag_mutability: IMMUTABLE
+    image_tag_mutability: MUTABLE
     lifecycle_rules:
       - rule_priority: 1
         description: "Delete all images older than 30 days regardless of tag"

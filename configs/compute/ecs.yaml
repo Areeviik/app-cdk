@@ -77,6 +77,8 @@ clusters:
         compatibility: EC2
         network_mode: BRIDGE
         scheduling_strategy: DAEMON
+        min_healthy_percent: 0
+        max_healthy_percent: 100
         task_cpu: 512
         task_memory_mib: "512"
         containers:
