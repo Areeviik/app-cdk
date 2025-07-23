@@ -8,7 +8,7 @@ albs:
       - eu-west-1a
       - eu-west-1b
     internet_facing: true
-    sg: alb-sg
+    sg: alb
     domain_name: dev.yospace.ai
     certificate:
       id: main-alb-cert

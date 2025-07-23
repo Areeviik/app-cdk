@@ -3,13 +3,23 @@ env: test
 
 buckets:
   - name: artifacts
-    access_control: BUCKET_OWNER_FULL_CONTROL
+    access_control: PRIVATE
     encryption: S3_MANAGED
-    public_block: true
-    block_public_acls: True
-
-  - name: frontend
-    access_control: BUCKET_OWNER_FULL_CONTROL
-    encryption: S3_MANAGED
-    public_block: true
-    block_public_policy: True
+    public_access_block:
+      block_public_acls: True
+      ignore_public_acls: True
+      block_public_policy: True
+      restrict_public_buckets: True
+    removal_policy: DESTROY
+    auto_delete_objects: true
+    versioned: false
+    lifecycle_rules:
+      - id: ExpireOldArtifacts
+        enabled: true
+        prefix: old-artifacts/
+        expiration_days: 90
+        transitions:
+          - storage_class: INFREQUENT_ACCESS
+            transition_after_days: 30
+          - storage_class: GLACIER
+            transition_after_days: 60
