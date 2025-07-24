@@ -1,22 +1,122 @@
 project_name: shinecosucan
 env: test
-vpc: main
-availability_zones:
-  - eu-west-1a
-  - eu-west-1b
-
-github_username: Areeviik
-artifact_bucket: "shinecosucan-test-artifacts"
 
 pipelines:
   frontend:
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
+    artifact_bucket: "shinecosucan-test-artifacts"
+    github_username: Areeviik
     repo: app-frontend
     branch: main
     build_cache_prefix: "frontend-codebuild-cache"
-    ecs_service_name: "shinecosucan-test-frontend-service"
-
+    ecs_cluster_name: "shinecosucan-test-main-cluster"
+    ecs_service_name: "shinecosucan-test-Frontend-service"
+    codebuild_policy_statements:
+      - actions:
+          - ecr:GetAuthorizationToken
+        resources: [ "*" ]
+        effect: ALLOW
+      - actions:
+          - ecs:DescribeServices
+          - ecs:UpdateService
+          - ecs:RegisterTaskDefinition
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:CompleteLayerUpload
+          - ecr:GetDownloadUrlForLayer
+          - ecr:BatchGetImage
+          - ecr:InitiateLayerUpload
+          - ecr:PutImage
+          - ecr:UploadLayerPart
+          - secretsmanager:GetSecretValue
+          - s3:GetBucketAcl
+          - s3:GetBucketLocation
+          - s3:PutObject
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        resources:
+          - "arn:aws:ecs:eu-west-1:577638398727:cluster/shinecosucan-test-main-cluster"
+          - "arn:aws:ecs:eu-west-1:577638398727:service/shinecosucan-test-main-cluster/shinecosucan-test-Frontend-service"
+          - "arn:aws:ecr:eu-west-1:577638398727:repository/shinecosucan-test-frontend"
+          - "arn:aws:s3:::shinecosucan-test-artifacts"
+          - "arn:aws:logs:eu-west-1:577638398727:log-group:/aws/codebuild/shinecosucan-test-frontend-build:*"
+        effect: ALLOW
+    stages:
+      - name: Source
+        actions:
+          - type: github_source
+            action_name: GitHub_Source
+      - name: Build
+        actions:
+          - type: codebuild
+            action_name: Frontend_Build
+      - name: Deploy
+        actions:
+          - type: ecs_deploy
+            action_name: Frontend_Deploy
+            deployment_vpc: false
   backend:
+    vpc: main
+    availability_zones:
+      - eu-west-1a
+      - eu-west-1b
+    artifact_bucket: "shinecosucan-test-artifacts"
+    github_username: Areeviik
     repo: app-backend
     branch: main
     build_cache_prefix: "codebuild-cache"
-    ecs_service_name: "shinecosucan-test-backend-service"
+    ecs_cluster_name: "shinecosucan-test-main-cluster"
+    ecs_service_name: "shinecosucan-test-Backend-service"
+    codebuild_policy_statements:
+      - actions:
+          - ecr:GetAuthorizationToken
+        resources: [ "*" ]
+        effect: ALLOW
+      - actions:
+          - ecs:DescribeServices
+          - ecs:UpdateService
+          - ecs:RegisterTaskDefinition
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:CompleteLayerUpload
+          - ecr:GetDownloadUrlForLayer
+          - ecr:BatchGetImage
+          - ecr:InitiateLayerUpload
+          - ecr:PutImage
+          - ecr:UploadLayerPart
+          - secretsmanager:GetSecretValue
+          - s3:GetBucketAcl
+          - s3:GetBucketLocation
+          - s3:PutObject
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+        resources:
+          - "arn:aws:ecs:eu-west-1:577638398727:cluster/shinecosucan-test-main-cluster"
+          - "arn:aws:ecs:eu-west-1:577638398727:service/shinecosucan-test-main-cluster/shinecosucan-test-backend-service"
+          - "arn:aws:ecr:eu-west-1:577638398727:repository/shinecosucan-test-backend"
+          - "arn:aws:s3:::shinecosucan-test-artifacts"
+          - "arn:aws:logs:eu-west-1:577638398727:log-group:/aws/codebuild/shinecosucan-test-backend-build:*"
+          - "arn:aws:secretsmanager:eu-west-1:577638398727:secret:shinecosucan/test/rds/vendure-db/credentials-foD7pqZz"
+        effect: ALLOW
+    stages:
+      - name: Source
+        actions:
+          - type: github_source
+            action_name: GitHub_Source
+      - name: Build
+        actions:
+          - type: codebuild
+            action_name: Backend_Build
+      - name: Deploy
+        actions:
+          - type: ecs_deploy
+            action_name: Backend_Deploy
