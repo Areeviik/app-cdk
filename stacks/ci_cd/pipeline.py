@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_ecs as ecs,
     aws_ec2 as ec2,
     aws_lambda as lambda_,
+    Tags
 )
 from constructs import Construct
 from typing import cast, Dict, Any, List
@@ -29,14 +30,12 @@ class CodePipelineStack(Stack):
             self._create_service_pipeline(svc_name, svc_conf)
 
     def _get_github_token(self, pipeline_name: str) -> str:
-        """Retrieves the GitHub token from Secrets Manager."""
         github_token_secret = sm.Secret.from_secret_name_v2(
             self, f"{pipeline_name}GitHubToken", f"{self.prj_name}/{self.env_name}/github-token"
         )
         return github_token_secret.secret_value_from_json("github-token")
 
     def _create_service_pipeline(self, svc_name: str, svc_conf: Dict[str, Any]):
-        """Creates a CodePipeline for a given service."""
         vpc = self._get_vpc(svc_name, svc_conf["vpc"], svc_conf.get("availability_zones", []))
         artifact_bucket = s3.Bucket.from_bucket_name(self, f"{svc_name.capitalize()}ArtifactBucket", svc_conf["artifact_bucket"])
         github_token = self._get_github_token(svc_name)
@@ -102,7 +101,6 @@ class CodePipelineStack(Stack):
                 )
 
     def _get_vpc(self, pipeline_name: str, vpc_name:str, azs:list) -> ec2.IVpc:
-        """Retrieves the VPC based on config."""
         public_subnet_ids = get_ssm_subnet_ids(
             self, f"/{self.prj_name}/{self.env_name}/{vpc_name}/subnet/public", 2
         )

@@ -5,35 +5,34 @@ instances:
   - name: vendure-db
     db_name: vendure
     username: postgres
-    engine_version: "17"
+
+    engine:
+      type: postgres
+      version: VER_17
+
     instance_class: BURSTABLE3
     instance_size: MICRO
-    multi_az: false
-    storage_encrypted: false
-    deletion_protection: false
-    subnet_type: PUBLIC
-    port: 5432
+
     vpc: main
-    security_group_name: db-sg
+    security_group_name: db
+    subnet_type: PUBLIC
     availability_zones:
       - eu-west-1a
       - eu-west-1b
-    parameter_group:
+    publicly_accessible: true
+    port: 5432
+
+    allocated_storage_gb: 20
+    storage_encrypted: false
+
+    multi_az: false
+    deletion_protection: false
+
+    backup_retention_days: 0
+
+    parameter_group_params:
       rds.force_ssl: "0"
 
-#  - name: analytics-db
-#    db_name: analytics
-#    username: analyst
-#    engine_version: "17"
-#    instance_class: BURSTABLE3
-#    instance_size: MICRO
-#    multi_az: false
-#    storage_encrypted: false
-#    deletion_protection: false
-#    subnet_type: PUBLIC
-#    port: 5432
-#    vpc: main
-#    security_group_name: db-sg
-#    availability_zones:
-#      - eu-west-1a
-#      - eu-west-1b
+    password_length: 12
+
+

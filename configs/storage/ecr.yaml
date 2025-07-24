@@ -4,12 +4,22 @@ env: test
 repositories:
   - name: frontend
     image_scan_on_push: true
-    lifecycle_max: 5
-    repository_name: shinecosucan-test-frontend
+    image_tag_mutability: MUTABLE
+    removal_policy: DESTROY
+    auto_delete_images: true
+    lifecycle_rules:
+      - rule_priority: 1
+        description: "Expire untagged images after 10 days"
+        tag_status: UNTAGGED
+        max_image_age_days: 10
     store_ssm: true
 
   - name: backend
     image_scan_on_push: true
-    lifecycle_max: 10
+    image_tag_mutability: MUTABLE
+    lifecycle_rules:
+      - rule_priority: 1
+        description: "Delete all images older than 30 days regardless of tag"
+        tag_status: ANY
+        max_image_age_days: 30
     store_ssm: true
-    ssm_param_name: /shinecosucan/test/ecr/backend-repo-uri

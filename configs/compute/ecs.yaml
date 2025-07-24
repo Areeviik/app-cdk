@@ -7,31 +7,84 @@ clusters:
     availability_zones:
       - eu-west-1a
       - eu-west-1b
+    security_groups: [backend]
+
+    capacity_provider_type: ASG
     instance_type: t3.small
+    asg_ami_type: AL2
     asg_min_capacity: 1
     asg_max_capacity: 4
-    asg_desired_capacity: 2
-    security_groups: [backend-sg]
+    asg_desired_capacity: 1
+    asg_subnet_type: PUBLIC
+    asg_associate_public_ip: true
+
+    task_execution_role:
+      description: "Custom ECS Task Execution Role for main cluster"
+      managed_policies:
+        - service-role/AmazonECSTaskExecutionRolePolicy
+        - AmazonEC2ContainerRegistryReadOnly
+      inline_policies:
+        - effect: ALLOW
+          actions:
+            - secretsmanager:GetSecretValue
+            - ssm:GetParameters
+          resources:
+            - arn:aws:secretsmanager:eu-west-1:577638398727:secret:shinecosucan/test/rds/vendure-db/credentials
+            - arn:aws:ssm:eu-west-1:577638398727:parameter/shinecosucan/test/rds/vendure-db/credentials
+            - arn:aws:ssm:eu-west-1:577638398727:parameter/shinecosucan/test/rds/vendure-db/host
+            - arn:aws:ssm:eu-west-1:577638398727:parameter/shinecosucan/test/rds/vendure-db/password
+            - arn:aws:ssm:eu-west-1:577638398727:parameter/shinecosucan/test/rds/vendure-db/port
+
     services:
       - name: Frontend
-        image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-frontend:latest"
-        cpu: 512
-        memory_mib: "916"
-        port: 8002
-        command: ["sh", "-c", "HOST=0.0.0.0 yarn dev"]
-        environment:
-          VENDURE_API_URL: "https://shinecosucan-admin.dev.yospace.ai/shop-api"
-          PORT: "8002"
-        tg_name: main-alb-shinecosucan-app
-      - name: backend
-        cpu: 512
-        memory_mib: "512"
-        port: 3000
-        tg_name: main-alb-shinecosucan-admin
+        compatibility: EC2
+        network_mode: BRIDGE
+        scheduling_strategy: DAEMON
+        min_healthy_percent: 0
+        max_healthy_percent: 100
+        task_cpu: 512
+        task_memory_mib: "916"
+        containers:
+          - name: Frontend
+            image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-frontend:latest"
+
+            command: [ "sh", "-c", "HOST=0.0.0.0 yarn dev" ]
+            environment:
+              VENDURE_API_URL: "https://shinecosucan-admin.dev.yospace.ai/shop-api"
+              PORT: "8002"
+            port_mappings:
+              - container_port: 8002
+                host_port: 8002
+                protocol: TCP
+            log_config:
+              enabled: true
+              retention_days: ONE_MONTH
+              removal_policy: DESTROY
+            container_health_check:
+              enabled: true
+              command: [ "CMD-SHELL", "curl -f http://localhost:8002/ || exit 1" ]
+              interval_seconds: 30
+              timeout_seconds: 5
+              retries: 3
+              start_period_seconds: 0
+
+        load_balancer_integrations:
+          - tg_name: main-alb-frontend-tg
+            container_name: Frontend
+            container_port: 8002
+
+      - name: Backend
+        compatibility: EC2
+        network_mode: BRIDGE
+        scheduling_strategy: DAEMON
+        min_healthy_percent: 0
+        max_healthy_percent: 100
+        task_cpu: 512
+        task_memory_mib: "512"
         containers:
           - name: Backend
             image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-backend:latest"
-            command: ["npm", "run", "start:server"]
+            command: [ "npm", "run", "start:server" ]
             environment:
               SUPERADMIN_USERNAME: "superadmin"
               SUPERADMIN_PASSWORD: "superadmin"
@@ -50,10 +103,21 @@ clusters:
               DB_PASSWORD:
                 secret_name: "shinecosucan/test/rds/vendure-db/credentials"
                 json_key: "password"
+            port_mappings:
+              - container_port: 3000
+                host_port: 3000
+                protocol: TCP
+            log_config:
+              enabled: true
+              retention_days: ONE_MONTH
+              removal_policy: DESTROY
+            container_health_check:
+              enabled: true
+              command: [ "CMD-SHELL", "curl -f http://localhost:3000/health || exit 1" ]
 
-          - name: worker
-            image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-backend:latest"
-            command: ["npm", "run", "start:worker"]
+          - name: Backend-Worker
+            image: "577638398727.dkr.ecr.eu-west-1.amazonaws.com/shinecosucan-test-backend:latest" # REPLACE
+            command: [ "npm", "run", "start:worker" ]
             environment:
               DB_USERNAME: "postgres"
               DB_NAME: "vendure"
@@ -66,3 +130,12 @@ clusters:
               DB_PASSWORD:
                 secret_name: "shinecosucan/test/rds/vendure-db/credentials"
                 json_key: "password"
+            log_config:
+              enabled: true
+              retention_days: ONE_MONTH
+              removal_policy: DESTROY
+
+        load_balancer_integrations:
+          - tg_name: main-alb-backend-tg
+            container_name: Backend-Api
+            container_port: 3000
